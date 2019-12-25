@@ -3102,66 +3102,62 @@ case "$target" in
                 soc_id=`cat /sys/devices/system/soc/soc0/id`
         fi
 
-        case "$soc_id" in
-            "355" | "369" | "377" | "380" | "384" )
-      target_type=`getprop ro.hardware.type`
-      if [ "$target_type" == "automotive" ]; then
-	# update frequencies
-	configure_sku_parameters
-	sku_identified=`getprop vendor.sku_identified`
-      else
-	sku_identified=0
-      fi
-
       # Core control parameters on silver
       echo 0 0 0 0 1 1 > /sys/devices/system/cpu/cpu0/core_ctl/not_preferred
       echo 4 > /sys/devices/system/cpu/cpu0/core_ctl/min_cpus
       echo 60 > /sys/devices/system/cpu/cpu0/core_ctl/busy_up_thres
       echo 40 > /sys/devices/system/cpu/cpu0/core_ctl/busy_down_thres
-      echo 100 > /sys/devices/system/cpu/cpu0/core_ctl/offline_delay_ms
-      echo 0 > /sys/devices/system/cpu/cpu0/core_ctl/is_big_cluster
       echo 8 > /sys/devices/system/cpu/cpu0/core_ctl/task_thres
+      echo 100 > /sys/devices/system/cpu/cpu0/core_ctl/offline_delay_ms
+
+      # Disable Core control
       echo 0 > /sys/devices/system/cpu/cpu6/core_ctl/enable
 
-
       # Setting b.L scheduler parameters
-      # default sched up and down migrate values are 90 and 85
-      echo 65 > /proc/sys/kernel/sched_downmigrate
-      echo 71 > /proc/sys/kernel/sched_upmigrate
-      # default sched up and down migrate values are 100 and 95
+      echo 65 85 > /proc/sys/kernel/sched_downmigrate
+      echo 71 95 > /proc/sys/kernel/sched_upmigrate
       echo 85 > /proc/sys/kernel/sched_group_downmigrate
       echo 100 > /proc/sys/kernel/sched_group_upmigrate
       echo 1 > /proc/sys/kernel/sched_walt_rotate_big_tasks
+      echo 0 > /proc/sys/kernel/sched_coloc_busy_hyst_ns
+      echo 0 > /proc/sys/kernel/sched_coloc_busy_hysteresis_enable_cpus
+      echo 0 > /proc/sys/kernel/sched_coloc_busy_hyst_max_ms
 
-      # colocation v3 settings
-      echo 740000 > /proc/sys/kernel/sched_little_cluster_coloc_fmin_khz
-
+      # disable unfiltering
+      echo 20000000 > /proc/sys/kernel/sched_task_unfilter_period
+      echo 1 > /proc/sys/kernel/sched_task_unfilter_nr_windows
 
       # configure governor settings for little cluster
-      echo "schedutil" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-      echo 0 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/up_rate_limit_us
-      echo 0 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/down_rate_limit_us
-      echo 1209600 > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/hispeed_freq
-      if [ $sku_identified != 1 ]; then
-        echo 576000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
-      fi
+      echo "schedutil" > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor
+      echo 0 > /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us
+      echo 0 > /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us
+      echo 1209600 > /sys/devices/system/cpu/cpufreq/policy0/schedutil/hispeed_freq
+      echo 0 > /sys/devices/system/cpu/cpufreq/policy0/schedutil/pl
+      echo 576000 > /sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq
+      echo 650000 > /sys/devices/system/cpu/cpufreq/policy0/schedutil/rtg_boost_freq
 
       # configure governor settings for big cluster
-      echo "schedutil" > /sys/devices/system/cpu/cpu6/cpufreq/scaling_governor
-      echo 0 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/up_rate_limit_us
-      echo 0 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/down_rate_limit_us
-      echo 1209600 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/hispeed_freq
-      if [ $sku_identified != 1 ]; then
-        echo 768000 > /sys/devices/system/cpu/cpu6/cpufreq/scaling_min_freq
-      fi
-
-      # sched_load_boost as -6 is equivalent to target load as 85. It is per cpu tunable.
-      echo -6 >  /sys/devices/system/cpu/cpu6/sched_load_boost
-      echo -6 >  /sys/devices/system/cpu/cpu7/sched_load_boost
+      echo "schedutil" > /sys/devices/system/cpu/cpufreq/policy6/scaling_governor
+      echo 0 > /sys/devices/system/cpu/cpufreq/policy6/schedutil/up_rate_limit_us
+      echo 0 > /sys/devices/system/cpu/cpufreq/policy6/schedutil/down_rate_limit_us
+      echo 1209600 > /sys/devices/system/cpu/cpufreq/policy6/schedutil/hispeed_freq
       echo 85 > /sys/devices/system/cpu/cpu6/cpufreq/schedutil/hispeed_load
+      echo -6 >  /sys/devices/system/cpu/cpu6/sched_load_boost
+      echo 85 > /sys/devices/system/cpu/cpu7/cpufreq/schedutil/hispeed_load
+      echo -6 >  /sys/devices/system/cpu/cpu7/sched_load_boost
+      echo 0 > /sys/devices/system/cpu/cpufreq/policy6/schedutil/pl
+      echo 768000 > /sys/devices/system/cpu/cpufreq/policy6/scaling_min_freq
+      echo 0 > /sys/devices/system/cpu/cpufreq/policy6/schedutil/rtg_boost_freq
 
-      echo "0:1209600" > /sys/module/cpu_boost/parameters/input_boost_freq
-      echo 40 > /sys/module/cpu_boost/parameters/input_boost_ms
+      # colocation v3 settings
+      echo 51 > /proc/sys/kernel/sched_min_task_util_for_boost
+      echo 35 > /proc/sys/kernel/sched_min_task_util_for_colocation
+
+      # Enable conservative pl
+      echo 1 > /proc/sys/kernel/sched_conservative_pl
+
+      echo "0:1209600" > /sys/devices/system/cpu/cpu_boost/input_boost_freq
+      echo 40 > /sys/devices/system/cpu/cpu_boost/input_boost_ms
 
       # Set Memory parameters
       configure_memory_parameters
@@ -3225,8 +3221,8 @@ case "$target" in
 
       done
             # cpuset parameters
-            echo 0-5 > /dev/cpuset/background/cpus
-            echo 0-5 > /dev/cpuset/system-background/cpus
+            echo 0-3 > /dev/cpuset/background/cpus
+            echo 0-3 > /dev/cpuset/system-background/cpus
 
             # Turn off scheduler boost at the end
             echo 0 > /proc/sys/kernel/sched_boost
